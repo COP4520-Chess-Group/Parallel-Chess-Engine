@@ -96,7 +96,7 @@ public class Move {
         private CastleType castle = CastleType.NONE;
         private Piece promotion = null;
 
-        private Builder(Piece piece, int deltaFile, int deltaRank) {
+        public Builder(Piece piece, int deltaFile, int deltaRank) {
             this.piece = piece;
             this.deltaFile = deltaFile;
             this.deltaRank = deltaRank;
