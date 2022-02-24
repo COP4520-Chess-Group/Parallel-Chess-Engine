@@ -78,6 +78,14 @@ public class Board {
         return board;
     }
 
+    public Board copyOf() {
+        return new Board(this.toString());
+    }
+
+    public Board move(Move move) {
+
+        return this;
+    }
 
     /**
      * @return FEN for the current board
