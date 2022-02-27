@@ -39,12 +39,15 @@ public class AppTest
     {
         // Easily generate test cases using following website:
         // http://bernd.bplaced.net/fengenerator/fengenerator.html
-        String tests[] = new String[2];
-        int answers[] = new int[2];
+        String tests[] = new String[3];
+        int answers[] = new int[3];
         tests[0] = "8/8/K4k2/8/8/8/8/8 w - - 0 1";
         answers[0] = 5;
         tests[1] = "8/6k1/8/8/8/3r4/2K5/8 w - - 0 1";
         answers[1] = 4;
+        tests[2] = "8/8/8/8/8/3rk3/7r/4K2R w K - 0 1";
+        answers[2] = 2;
+        System.out.println("Testing" + (new Board(tests[2])).generateMoves());
 
         for (int i = 0; i < tests.length; i++)
         {

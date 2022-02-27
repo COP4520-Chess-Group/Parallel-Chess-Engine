@@ -1,7 +1,9 @@
 package edu.ucf.cop4520.game;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.security.cert.PKIXReason;
 import java.util.Set;
+import java.util.Stack;
 
 import edu.ucf.cop4520.game.pieces.*;
 import edu.ucf.cop4520.game.Move;
@@ -125,6 +127,41 @@ public class Board {
                 this.halfMoveClock,
                 this.fullMoveClock));
         return sb.toString();
+    }
+
+    // Returns a stack with all possible places king could move to if at rank/file or
+    // all possible places a king could attack rank/file from
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> kingMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        for (int r = -1; r <= 1; r++)
+        {
+            for (int f = -1; f <= 1; f++)
+            {
+                if ((rank + r) >= 0 && (rank + r) < 8 && (file + f) >= 0 && (file + f) < 8)
+                {
+                    // Add move
+                    moves.push(f);
+                    moves.push(r);
+                }
+            }
+        }
+        // Adds castling moves
+        // Adds queenside castling (black lowercase, white uppercase)
+        if ((castlingRights.indexOf('q') != -1 && toMove == Piece.Color.DARK) ||
+            (castlingRights.indexOf('Q') != -1 && toMove == Piece.Color.LIGHT))
+        {
+            moves.push(-2);
+            moves.push(0);
+        }
+        // Adds kingside castling
+        if ((castlingRights.indexOf('k') != -1 && toMove == Piece.Color.DARK) ||
+            (castlingRights.indexOf('K') != -1 && toMove == Piece.Color.LIGHT))
+        {
+            moves.push(2);
+            moves.push(0);
+        }
+        return moves;
     }
 
     // Returns true if board if player whose move it is is currently in check
@@ -266,15 +303,17 @@ public class Board {
             }
         }
         // Check for king attacks
-        for (int i = -1; i <= 1; i++)
+        Stack<Integer> kingAttacks = kingMoves(kRank, kFile);
+        int r, f;
+        while (!kingAttacks.empty())
         {
-            for (int j = -1; j <= 1; j++)
+            r = kingAttacks.pop();
+            f = kingAttacks.pop();
+            if ((kRank + r) < 8 && (kRank + r) >= 0 && (kFile + f) < 8 && (kFile + f) >= 0 &&
+                board[kRank + r][kFile + f] != null && board[kRank + r][kFile + f] instanceof King
+                && board[kRank + r][kFile + f].getColor() != toMove && f != -2 && f != 2)
             {
-                if ((kRank + i) >= 0 && (kRank + i) < 8 && (kFile + j) >= 0 && (kFile + j) < 8 &&
-                    board[kRank + i][kFile + j] != null && board[kRank + i][kFile + j] instanceof King && board[kRank + i][kFile + j].getColor() != toMove)
-                {
-                    return true;
-                }
+                return true;
             }
         }
         // Check for knight attacks
@@ -336,6 +375,36 @@ public class Board {
             }          
             kRank -= r;
             kFile -= f;
+            // Checks if its queenside or kingside castling respectively
+            // Then checks if its legal (space unoccupied and king never enters check)
+            if (f == -2)
+            {
+                if (board[rank][file - 1] != null || board[rank][file - 2] != null || board[rank][file - 3] != null)
+                {
+                    return;
+                }
+                kFile -= 1;
+                if (causesCheck(rank, file, r, -1))
+                {
+                    kFile += 1;
+                    return;
+                }
+                kFile += 1;
+            }
+            else if (f == 2)
+            {
+                if (board[rank][file + 1] != null || board[rank][file + 2] != null)
+                {
+                    return;
+                }
+                kFile += 1;
+                if (causesCheck(rank, file, r, 1))
+                {
+                    kFile -= 1;
+                    return;
+                }
+                kFile -= 1;
+            }
         }
         else
         {
@@ -373,20 +442,22 @@ public class Board {
     }
 
     // Adds any moves the king can make to the moves concurrent hashset
-    public void generateKingMoves(Set<Move> moves, int rank, int file) {
-        for (int r = -1; r <= 1; r++)
+    public void addKingMoves(Set<Move> moves, int rank, int file) {
+        Stack<Integer> kingAttacks = kingMoves(kRank, kFile);
+        int r, f;
+        while (!kingAttacks.empty())
         {
-            for (int f = -1; f <= 1; f++)
-            {
-                if ((rank + r) >= 0 && (rank + r) < 8 && (file + f) >= 0 && (file + f) < 8)
-                {
-                    // Add move
-                    addMove(moves, rank, file, r, f);
-                }
-            }
+            r = kingAttacks.pop();
+            f = kingAttacks.pop();
+            // Add move
+            addMove(moves, rank, file, r, f);
         }
-        // Need to add castling moves here
         return;
+    }
+
+    // Adds any moves the rook can make to the moves concurrent hashset
+    public void addRookMoves(Set<Move> moves, int rank, int file) {
+        //
     }
 
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
@@ -414,7 +485,7 @@ public class Board {
         // Find king
         findKing();
         // Generate possible moves for each piece
-        generateKingMoves(moves, kRank, kFile);
+        addKingMoves(moves, kRank, kFile);
         // generate rook moves
         // generate bishop moves
         // generate knight moves
