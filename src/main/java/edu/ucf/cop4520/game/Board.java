@@ -17,6 +17,7 @@ public class Board {
     private Piece[][] board = new Piece[8][8];
     private Piece[] kings = new King[2];
     private Piece[] rooks = new Rook[4];
+    private Piece[] bishops = new Bishop[4];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -27,7 +28,7 @@ public class Board {
 
     public Board(String fen) {
         int characterBeginIndex = 0;
-        int colorIndex, lightRookIndex = 0, darkRookIndex = 0;
+        int colorIndex, lightRookIndex = 0, darkRookIndex = 0, lightBishopIndex = 0, darkBishopIndex = 0;
         for(int i = 7; i >= 0; i--) {
             String row;
             if(fen.indexOf('/') == -1)
@@ -72,6 +73,17 @@ public class Board {
                             break;
                         case 'b':
                             board[i][j] = new Bishop(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            if (colorIndex == 0)
+                            {
+                                bishops[lightBishopIndex] = board[i][j];
+                                lightBishopIndex++;
+                            }
+                            else
+                            {
+                                bishops[darkBishopIndex] = board[i][j];
+                                darkBishopIndex++;
+                            }
                             j++;
                             break;
                         case 'q':
@@ -191,12 +203,22 @@ public class Board {
         return moves;
     }
 
-    // Returns a stack with all possible places rook could move to if at rank/file or
+    // Returns a stack with all possible places a rook could move to if at rank/file or
     // all possible places a rook could attack rank/file from
     // Note: moves are represented as 2 integers so pop rank then pop file
     public Stack<Integer> rookMoves(int rank, int file) {
         Stack<Integer> moves = new Stack<Integer>();
         straightMoves(moves, rank, file);
+        return moves;
+    }
+
+    // Returns a stack with all possible places a bishop could move to if at rank/file or
+    // all possible places a bishop could attack rank/file from
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> bishopMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        diagonalMoves(moves, rank, file);
+        System.out.println("this wont run");
         return moves;
     }
 
@@ -251,13 +273,10 @@ public class Board {
     public void diagonalMoves(Stack<Integer> moves, int rank, int file)
     {
         // Add up right moves
-        for (int r = 1; (rank + r) < 8; r++)
+        for (int r = 1; (rank + r) < 8 && (file + r) < 8; r++)
         {
-            if ((file + r) < 8)
-            {
-                moves.push(file + r);
-                moves.push(rank + r);
-            }
+            moves.push(r);
+            moves.push(r);
             // Checks if path is blocked
             if (board[rank + r][file + r] != null)
             {
@@ -265,13 +284,10 @@ public class Board {
             }
         }
         // Add up left moves
-        for (int r = 1; (rank + r) < 8; r++)
+        for (int r = 1; (rank + r) < 8 && (file - r) >= 0; r++)
         {
-            if ((file - r) >= 0)
-            {
-                moves.push(file - r);
-                moves.push(rank + r);
-            }
+            moves.push(0 - r);
+            moves.push(r);
             // Checks if path is blocked
             if (board[rank + r][file - r] != null)
             {
@@ -279,13 +295,10 @@ public class Board {
             }
         }
         // Add down right moves
-        for (int r = 1; (rank - r) >= 0; r++)
+        for (int r = 1; (rank - r) >= 0 && (file + r) < 8; r++)
         {
-            if ((file + r) < 8)
-            {
-                moves.push(file + r);
-                moves.push(rank - r);
-            }
+            moves.push(r);
+            moves.push(0 - r);
             // Checks if path is blocked
             if (board[rank - r][file + r] != null)
             {
@@ -293,13 +306,10 @@ public class Board {
             }
         }
         // Add down left moves
-        for (int r = 1; (rank - r) >= 0; r++)
+        for (int r = 1; (rank - r) >= 0 && (file - r) >= 0; r++)
         {
-            if ((file - r) >= 0)
-            {
-                moves.push(file - r);
-                moves.push(rank - r);
-            }
+            moves.push(0 - r);
+            moves.push(0 - r);
             // Checks if path is blocked
             if (board[rank - r][file - r] != null)
             {
@@ -498,6 +508,7 @@ public class Board {
     // rank and file are where piece currently is, r and f are how its moving
     public void addMove(Set<Move> moves, int rank, int file, int r, int f)
     {
+        //System.out.println("testing rank:"+rank+",file:"+file+",r:"+r+",f:"+f);
         // Return if trying to move ontop of your own piece or try to capture a king
         if (board[rank + r][file + f] != null && board[rank + r][file + f].getColor() == toMove ||
             board[rank + r][file + f] instanceof King)
@@ -622,6 +633,22 @@ public class Board {
         return;
     }
 
+    // Adds any moves the bishop can make to the moves concurrent hashset
+    public void addBishopMoves(Set<Move> moves) {
+        int rank, file, r, f;
+        for (int i = 0; i < 4; i++)
+        {
+            if (bishops[i] != null && bishops[i].getRank() != -1 && bishops[i].getColor() == toMove)
+            {
+                rank = bishops[i].getRank();
+                file = bishops[i].getFile();
+                Stack<Integer> newMoves = bishopMoves(rank, file);
+                addMoves(moves, newMoves, rank, file);
+            }
+        }
+        return;
+    }
+
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
     public void findKing()
     {
@@ -647,7 +674,7 @@ public class Board {
         // Generate possible moves for each piece
         addKingMoves(moves, kRank, kFile);
         addRookMoves(moves);
-        // generate bishop moves
+        addBishopMoves(moves);
         // generate knight moves
         // generate queen moves
         // generate pawn moves
