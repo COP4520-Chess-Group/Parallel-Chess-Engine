@@ -1,6 +1,9 @@
 package edu.ucf.cop4520.game;
 
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.lang.model.util.ElementScanner14;
+
 import java.security.cert.PKIXReason;
 import java.util.Set;
 import java.util.Stack;
@@ -13,6 +16,7 @@ public class Board {
 
     private Piece[][] board = new Piece[8][8];
     private Piece[] kings = new King[2];
+    private Piece[] rooks = new Rook[4];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -23,7 +27,7 @@ public class Board {
 
     public Board(String fen) {
         int characterBeginIndex = 0;
-        int colorIndex;
+        int colorIndex, lightRookIndex = 0, darkRookIndex = 0;
         for(int i = 7; i >= 0; i--) {
             String row;
             if(fen.indexOf('/') == -1)
@@ -49,6 +53,17 @@ public class Board {
                     switch(Character.toLowerCase(ch)) {
                         case 'r':
                             board[i][j] = new Rook(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            if (colorIndex == 0)
+                            {
+                                rooks[lightRookIndex] = board[i][j];
+                                lightRookIndex++;
+                            }
+                            else
+                            {
+                                rooks[darkRookIndex] = board[i][j];
+                                darkRookIndex++;
+                            }
                             j++;
                             break;
                         case 'n':
@@ -176,15 +191,23 @@ public class Board {
         return moves;
     }
 
-    // Returns a stack with all possible straight attacks (up/down/right/left for rooks/queens)
+    // Returns a stack with all possible places rook could move to if at rank/file or
+    // all possible places a rook could attack rank/file from
     // Note: moves are represented as 2 integers so pop rank then pop file
-    public Stack<Integer> straightMoves(int rank, int file) {
+    public Stack<Integer> rookMoves(int rank, int file) {
         Stack<Integer> moves = new Stack<Integer>();
+        straightMoves(moves, rank, file);
+        return moves;
+    }
+
+    // Adds to given stack all possible straight attacks (up/down/right/left for rooks/queens)
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public void straightMoves(Stack<Integer> moves, int rank, int file) {
         // Add upward moves
         for (int r = 1; (rank + r) < 8; r++)
         {
-            moves.push(file);
-            moves.push(rank + r);
+            moves.push(0);
+            moves.push(r);
             // Checks if path is blocked
             if (board[rank + r][file] != null)
             {
@@ -194,8 +217,8 @@ public class Board {
         // Add downward moves
         for (int r = -1; (rank + r) >= 0; r--)
         {
-            moves.push(file);
-            moves.push(rank + r);
+            moves.push(0);
+            moves.push(r);
             if (board[rank + r][file] != null)
             {
                 r = -8;
@@ -204,8 +227,8 @@ public class Board {
         // Add rightward moves
         for (int f = 1; (file + f) < 8; f++)
         {
-            moves.push(file + f);
-            moves.push(rank);
+            moves.push(f);
+            moves.push(0);
             if (board[rank][file + f] != null)
             {
                 f = 8;
@@ -214,14 +237,75 @@ public class Board {
         // Add leftward moves
         for (int f = -1; (file + f) >= 0; f--)
         {
-            moves.push(file + f);
-            moves.push(rank);
+            moves.push(f);
+            moves.push(0);
             if (board[rank][file + f] != null)
             {
                 f = -8;
             }
         }
-        return moves;
+    }
+
+    // Adds to give stack all possible diagonal attacks (up left/up right/down left/down right for bishops/queens)
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public void diagonalMoves(Stack<Integer> moves, int rank, int file)
+    {
+        // Add up right moves
+        for (int r = 1; (rank + r) < 8; r++)
+        {
+            if ((file + r) < 8)
+            {
+                moves.push(file + r);
+                moves.push(rank + r);
+            }
+            // Checks if path is blocked
+            if (board[rank + r][file + r] != null)
+            {
+                r = 8;
+            }
+        }
+        // Add up left moves
+        for (int r = 1; (rank + r) < 8; r++)
+        {
+            if ((file - r) >= 0)
+            {
+                moves.push(file - r);
+                moves.push(rank + r);
+            }
+            // Checks if path is blocked
+            if (board[rank + r][file - r] != null)
+            {
+                r = 8;
+            }
+        }
+        // Add down right moves
+        for (int r = 1; (rank - r) >= 0; r++)
+        {
+            if ((file + r) < 8)
+            {
+                moves.push(file + r);
+                moves.push(rank - r);
+            }
+            // Checks if path is blocked
+            if (board[rank - r][file + r] != null)
+            {
+                r = 8;
+            }
+        }
+        // Add down left moves
+        for (int r = 1; (rank - r) >= 0; r++)
+        {
+            if ((file - r) >= 0)
+            {
+                moves.push(file - r);
+                moves.push(rank - r);
+            }
+            // Checks if path is blocked
+            if (board[rank - r][file - r] != null)
+            {
+                r = 8;
+            }
+        }
     }
 
     // Returns true if board if player whose move it is is currently in check
@@ -501,23 +585,41 @@ public class Board {
         return;
     }
 
-    // Adds any moves the king can make to the moves concurrent hashset
-    public void addKingMoves(Set<Move> moves, int rank, int file) {
-        Stack<Integer> kingAttacks = kingMoves(kRank, kFile);
+    // Adds moves represented by integers in newMoves stack to the moves set
+    public void addMoves(Set<Move> moves, Stack<Integer> newMoves, int rank, int file)
+    {
         int r, f;
-        while (!kingAttacks.empty())
+        while (!newMoves.empty())
         {
-            r = kingAttacks.pop();
-            f = kingAttacks.pop();
+            r = newMoves.pop();
+            f = newMoves.pop();
             // Add move
             addMove(moves, rank, file, r, f);
         }
         return;
     }
 
+    // Adds any moves the king can make to the moves concurrent hashset
+    public void addKingMoves(Set<Move> moves, int rank, int file) {
+        Stack<Integer> newMoves = kingMoves(kRank, kFile);
+        addMoves(moves, newMoves, rank, file);
+        return;
+    }
+
     // Adds any moves the rook can make to the moves concurrent hashset
-    public void addRookMoves(Set<Move> moves, int rank, int file) {
-        //
+    public void addRookMoves(Set<Move> moves) {
+        int rank, file, r, f;
+        for (int i = 0; i < 4; i++)
+        {
+            if (rooks[i] != null && rooks[i].getRank() != -1 && rooks[i].getColor() == toMove)
+            {
+                rank = rooks[i].getRank();
+                file = rooks[i].getFile();
+                Stack<Integer> newMoves = rookMoves(rank, file);
+                addMoves(moves, newMoves, rank, file);
+            }
+        }
+        return;
     }
 
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
@@ -544,7 +646,7 @@ public class Board {
         findKing();
         // Generate possible moves for each piece
         addKingMoves(moves, kRank, kFile);
-        // generate rook moves
+        addRookMoves(moves);
         // generate bishop moves
         // generate knight moves
         // generate queen moves

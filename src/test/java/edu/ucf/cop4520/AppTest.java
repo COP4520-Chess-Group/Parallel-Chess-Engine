@@ -46,8 +46,8 @@ public class AppTest
         tests[1] = "8/6k1/8/8/8/3r4/2K5/8 w - - 0 1";
         answers[1] = 4;
         tests[2] = "8/8/8/8/8/3rk3/7r/4K2R w K - 0 1";
-        answers[2] = 2;
-        System.out.println("Testing" + (new Board(tests[2])).generateMoves());
+        answers[2] = 5;
+        //System.out.println("Testing" + (new Board(tests[2])).generateMoves());
 
         for (int i = 0; i < tests.length; i++)
         {
