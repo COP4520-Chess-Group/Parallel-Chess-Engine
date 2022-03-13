@@ -12,6 +12,7 @@ public class Board {
     private Piece[] kings = new King[2];
     private Piece[] rooks = new Rook[4];
     private Piece[] bishops = new Bishop[4];
+    private Piece[] knights = new Knight[4];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -22,7 +23,7 @@ public class Board {
 
     public Board(String fen) {
         int characterBeginIndex = 0;
-        int colorIndex, lightRookIndex = 0, darkRookIndex = 0, lightBishopIndex = 0, darkBishopIndex = 0;
+        int colorIndex, lightRookIndex = 0, darkRookIndex = 0, lightBishopIndex = 0, darkBishopIndex = 0, lightKnightIndex = 0, darkKnightIndex = 0;
         for(int i = 7; i >= 0; i--) {
             String row;
             if(fen.indexOf('/') == -1)
@@ -63,6 +64,17 @@ public class Board {
                             break;
                         case 'n':
                             board[i][j] = new Knight(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            if (colorIndex == 0)
+                            {
+                                knights[lightKnightIndex] = board[i][j];
+                                lightKnightIndex++;
+                            }
+                            else
+                            {
+                                knights[darkKnightIndex] = board[i][j];
+                                darkKnightIndex++;
+                            }
                             j++;
                             break;
                         case 'b':
@@ -212,7 +224,28 @@ public class Board {
     public Stack<Integer> bishopMoves(int rank, int file) {
         Stack<Integer> moves = new Stack<Integer>();
         diagonalMoves(moves, rank, file);
-        System.out.println("this wont run");
+        return moves;
+    }
+
+    // Returns a stack with all possible places a knight could move to if at rank/file or
+    // all possible places a knight could attack rank/file from
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> knightMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        for (int i = -2; i <= 2; i++)
+        {
+            for (int j = -2; j <= 2; j++)
+            {
+                if ((Math.abs(i) == 1 && Math.abs(j) == 2) || (Math.abs(i) == 2 && Math.abs(j) == 1))
+                {
+                    if ((rank + i) < 8 && (rank + i) >= 0 && (file + j) < 8 && (file + j) >= 0)
+                    {
+                        moves.push(j);
+                        moves.push(i);
+                    }
+                }
+            }
+        }
         return moves;
     }
 
@@ -469,7 +502,7 @@ public class Board {
         {
             for (int j = -2; j <= 2; j++)
             {
-                if ((i == Math.abs(1) && j == Math.abs(2)) || (i == Math.abs(2) && j == Math.abs(1)))
+                if ((Math.abs(i) == 1 && Math.abs(j) == 2) || (Math.abs(i) == 2 && Math.abs(j) == 1))
                 {
                     if ((kRank + i) < 8 && (kRank + i) >= 0 && (kFile + j) < 8 && (kFile + j) >= 0 &&
                         board[kRank + i][kFile + j] != null && board[kRank + i][kFile + j] instanceof Knight && board[kRank + i][kFile + j].getColor() != toMove)
@@ -643,6 +676,22 @@ public class Board {
         return;
     }
 
+    // Adds any moves the bishop can make to the moves concurrent hashset
+    public void addKnightMoves(Set<Move> moves) {
+        int rank, file, r, f;
+        for (int i = 0; i < 4; i++)
+        {
+            if (knights[i] != null && knights[i].getRank() != -1 && knights[i].getColor() == toMove)
+            {
+                rank = knights[i].getRank();
+                file = knights[i].getFile();
+                Stack<Integer> newMoves = knightMoves(rank, file);
+                addMoves(moves, newMoves, rank, file);
+            }
+        }
+        return;
+    }
+
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
     public void findKing()
     {
@@ -669,7 +718,7 @@ public class Board {
         addKingMoves(moves, kRank, kFile);
         addRookMoves(moves);
         addBishopMoves(moves);
-        // generate knight moves
+        addKnightMoves(moves);
         // generate queen moves
         // generate pawn moves
         return moves;
