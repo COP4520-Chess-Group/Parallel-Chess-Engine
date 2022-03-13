@@ -1,7 +1,4 @@
 package edu.ucf.cop4520;
-
-import static org.junit.Assert.assertTrue;
-
 import edu.ucf.cop4520.game.Board;
 import org.junit.Assert;
 import org.junit.Test;
