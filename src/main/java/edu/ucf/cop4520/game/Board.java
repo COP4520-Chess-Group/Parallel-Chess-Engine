@@ -12,6 +12,7 @@ public class Board {
     public static final String startingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     private Piece[][] board = new Piece[8][8];
+    private Piece[] kings = new King[2];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -22,6 +23,7 @@ public class Board {
 
     public Board(String fen) {
         int characterBeginIndex = 0;
+        int colorIndex;
         for(int i = 7; i >= 0; i--) {
             String row;
             if(fen.indexOf('/') == -1)
@@ -36,6 +38,14 @@ public class Board {
                     j += Integer.parseInt(ch + "");
                 else {
                     Piece.Color color = Character.isUpperCase(ch) ? Piece.Color.LIGHT : Piece.Color.DARK;
+                    if (color == Piece.Color.LIGHT)
+                    {
+                        colorIndex = 0;
+                    }
+                    else
+                    {
+                        colorIndex = 1;
+                    }
                     switch(Character.toLowerCase(ch)) {
                         case 'r':
                             board[i][j] = new Rook(color);
@@ -55,6 +65,8 @@ public class Board {
                             break;
                         case 'k':
                             board[i][j] = new King(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            kings[colorIndex] = board[i][j];
                             j++;
                             break;
                         case 'p':
@@ -160,6 +172,54 @@ public class Board {
         {
             moves.push(2);
             moves.push(0);
+        }
+        return moves;
+    }
+
+    // Returns a stack with all possible straight attacks (up/down/right/left for rooks/queens)
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> straightMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        // Add upward moves
+        for (int r = 1; (rank + r) < 8; r++)
+        {
+            moves.push(file);
+            moves.push(rank + r);
+            // Checks if path is blocked
+            if (board[rank + r][file] != null)
+            {
+                r = 8;
+            }
+        }
+        // Add downward moves
+        for (int r = -1; (rank + r) >= 0; r--)
+        {
+            moves.push(file);
+            moves.push(rank + r);
+            if (board[rank + r][file] != null)
+            {
+                r = -8;
+            }
+        }
+        // Add rightward moves
+        for (int f = 1; (file + f) < 8; f++)
+        {
+            moves.push(file + f);
+            moves.push(rank);
+            if (board[rank][file + f] != null)
+            {
+                f = 8;
+            }
+        }
+        // Add leftward moves
+        for (int f = -1; (file + f) >= 0; f--)
+        {
+            moves.push(file + f);
+            moves.push(rank);
+            if (board[rank][file + f] != null)
+            {
+                f = -8;
+            }
         }
         return moves;
     }
@@ -463,17 +523,15 @@ public class Board {
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
     public void findKing()
     {
-        for (int i = 0; i < 8; i++)
+        if (toMove == Piece.Color.LIGHT)
         {
-            for (int j = 0; j < 8; j++)
-            {
-                if (board[i][j] instanceof King && board[i][j].getColor() == toMove)
-                {
-                    kRank = i;
-                    kFile = j;
-                    i = j = 8;
-                }
-            }
+            kRank = kings[0].getRank();
+            kFile = kings[0].getFile();
+        }
+        else
+        {
+            kRank = kings[1].getRank();
+            kFile = kings[1].getFile();
         }
         return;
     }
