@@ -13,6 +13,7 @@ public class Board {
     private Piece[] rooks = new Rook[4];
     private Piece[] bishops = new Bishop[4];
     private Piece[] knights = new Knight[4];
+    private Piece[] queens = new Queen[2];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -94,6 +95,15 @@ public class Board {
                             break;
                         case 'q':
                             board[i][j] = new Queen(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            if (colorIndex == 0)
+                            {
+                                queens[0] = board[i][j];
+                            }
+                            else
+                            {
+                                queens[1] = board[i][j];
+                            }
                             j++;
                             break;
                         case 'k':
@@ -223,6 +233,16 @@ public class Board {
     // Note: moves are represented as 2 integers so pop rank then pop file
     public Stack<Integer> bishopMoves(int rank, int file) {
         Stack<Integer> moves = new Stack<Integer>();
+        diagonalMoves(moves, rank, file);
+        return moves;
+    }
+
+    // Returns a stack with all possible places a queen could move to if at rank/file or
+    // all possible places a queen could attack rank/file from
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> queenMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        straightMoves(moves, rank, file);
         diagonalMoves(moves, rank, file);
         return moves;
     }
@@ -692,6 +712,22 @@ public class Board {
         return;
     }
 
+    // Adds any moves the queen can make to the moves concurrent hashset
+    public void addQueenMoves(Set<Move> moves) {
+        int rank, file, r, f;
+        for (int i = 0; i < 2; i++)
+        {
+            if (queens[i] != null && queens[i].getRank() != -1 && queens[i].getColor() == toMove)
+            {
+                rank = queens[i].getRank();
+                file = queens[i].getFile();
+                Stack<Integer> newMoves = queenMoves(rank, file);
+                addMoves(moves, newMoves, rank, file);
+            }
+        }
+        return;
+    }
+
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
     public void findKing()
     {
@@ -719,7 +755,7 @@ public class Board {
         addRookMoves(moves);
         addBishopMoves(moves);
         addKnightMoves(moves);
-        // generate queen moves
+        addQueenMoves(moves);
         // generate pawn moves
         return moves;
     }
