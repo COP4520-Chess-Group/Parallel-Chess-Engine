@@ -14,6 +14,7 @@ public class Board {
     private Piece[] bishops = new Bishop[4];
     private Piece[] knights = new Knight[4];
     private Piece[] queens = new Queen[2];
+    private Piece[] pawns = new Pawn[16];
     private String castlingRights;
     private Piece.Color toMove;
     private String enPassant;
@@ -24,7 +25,7 @@ public class Board {
 
     public Board(String fen) {
         int characterBeginIndex = 0;
-        int colorIndex, lightRookIndex = 0, darkRookIndex = 0, lightBishopIndex = 0, darkBishopIndex = 0, lightKnightIndex = 0, darkKnightIndex = 0;
+        int colorIndex, lightRookIndex = 0, darkRookIndex = 0, lightBishopIndex = 0, darkBishopIndex = 0, lightKnightIndex = 0, darkKnightIndex = 0, lightPawnIndex = 0, darkPawnIndex = 0;
         for(int i = 7; i >= 0; i--) {
             String row;
             if(fen.indexOf('/') == -1)
@@ -114,6 +115,17 @@ public class Board {
                             break;
                         case 'p':
                             board[i][j] = new Pawn(color);
+                            board[i][j].move((new Move.Builder(board[i][j], j, i)).build());
+                            if (colorIndex == 0)
+                            {
+                                pawns[lightPawnIndex] = board[i][j];
+                                lightPawnIndex++;
+                            }
+                            else
+                            {
+                                pawns[darkPawnIndex] = board[i][j];
+                                darkPawnIndex++;
+                            }
                             j++;
                             break;
                     }
@@ -262,6 +274,106 @@ public class Board {
                     {
                         moves.push(j);
                         moves.push(i);
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    // Returns a stack with all possible places a pawn could move to if at rank/file or
+    // all possible places a pawn could attack rank/file from
+    // Note: moves are represented as 2 integers so pop rank then pop file
+    public Stack<Integer> pawnMoves(int rank, int file) {
+        Stack<Integer> moves = new Stack<Integer>();
+        if (toMove == Piece.Color.LIGHT)
+        {
+            // Add one space forward (up) move
+            if (rank < 7 && board[rank + 1][file] == null)
+            {
+                moves.push(0);
+                moves.push(1);
+            }
+            // Add two spaces forward (up) move if haven't moved before i.e. at starting position still
+            if (rank == 1 && board[rank + 1][file] == null && board[rank + 2][file] == null)
+            {
+                moves.push(0);
+                moves.push(2);
+            }
+            // Adds attack on the left (up left)
+            if ((rank + 1) < 8 && (file - 1) >= 0 && board[rank + 1][file - 1] != null && board[rank + 1][file - 1].getColor() != toMove)
+            {
+                moves.push(-1);
+                moves.push(1);
+            }
+            // Adds attack on the right (up right)
+            if ((rank + 1) < 8 && (file + 1) < 8 && board[rank + 1][file + 1] != null && board[rank + 1][file + 1].getColor() != toMove)
+            {
+                moves.push(1);
+                moves.push(1);
+            }
+            // Adds en passant attack
+            if (enPassant.charAt(0) != '-')
+            {
+                int r = Integer.parseInt(enPassant.substring(1)) - 1;
+                int f = (int)(enPassant.charAt(0) - 'a');
+                if ((rank + 1) == r)
+                {
+                    if ((file - 1) == f)
+                    {
+                        moves.push(-1);
+                        moves.push(1);
+                    }
+                    else if ((file + 1) == f)
+                    {
+                        moves.push(1);
+                        moves.push(1);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Add one space forward (down) move
+            if (rank >= 0 && board[rank - 1][file] == null)
+            {
+                moves.push(0);
+                moves.push(-1);
+            }
+            // Add two spaces forward (down) move if haven't moved before i.e. at starting position still
+            if (rank == 6 && board[rank - 1][file] == null && board[rank - 2][file] == null)
+            {
+                moves.push(0);
+                moves.push(-2);
+            }
+            // Adds attack on the left (down left)
+            if ((rank - 1) >= 0 && (file - 1) >= 0 && board[rank - 1][file - 1] != null && board[rank - 1][file - 1].getColor() != toMove)
+            {
+                moves.push(-1);
+                moves.push(-1);
+            }
+            // Adds attack on the right (down right)
+            if ((rank - 1) >= 0 && (file + 1) < 8 && board[rank - 1][file + 1] != null && board[rank - 1][file + 1].getColor() != toMove)
+            {
+                moves.push(1);
+                moves.push(-1);
+            }
+            // Adds en passant attack
+            if (enPassant.charAt(0) != '-')
+            {
+                int r = Integer.parseInt(enPassant.substring(1)) - 1;
+                int f = (int)(enPassant.charAt(0) - 'a');
+                if ((rank - 1) == r)
+                {
+                    if ((file - 1) == f)
+                    {
+                        moves.push(-1);
+                        moves.push(-1);
+                    }
+                    else if ((file + 1) == f)
+                    {
+                        moves.push(1);
+                        moves.push(-1);
                     }
                 }
             }
@@ -728,6 +840,22 @@ public class Board {
         return;
     }
 
+    // Adds any moves the pawns can make to the moves concurrent hashset
+    public void addPawnMoves(Set<Move> moves) {
+        int rank, file, r, f;
+        for (int i = 0; i < 16; i++)
+        {
+            if (pawns[i] != null && pawns[i].getRank() != -1 && pawns[i].getColor() == toMove)
+            {
+                rank = pawns[i].getRank();
+                file = pawns[i].getFile();
+                Stack<Integer> newMoves = pawnMoves(rank, file);
+                addMoves(moves, newMoves, rank, file);
+            }
+        }
+        return;
+    }
+
     // Sets kRank and kFile to be the position of the king of the player's whose turn it is
     public void findKing()
     {
@@ -756,7 +884,7 @@ public class Board {
         addBishopMoves(moves);
         addKnightMoves(moves);
         addQueenMoves(moves);
-        // generate pawn moves
+        addPawnMoves(moves);
         return moves;
     }
 
