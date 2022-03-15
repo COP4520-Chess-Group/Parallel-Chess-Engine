@@ -4,16 +4,17 @@ import java.util.Set;
 import java.util.Stack;
 import edu.ucf.cop4520.game.pieces.*;
 import edu.ucf.cop4520.game.Move;
+import edu.ucf.cop4520.game.Move.CastleType;
 
 public class Board {
     public static final String startingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     private Piece[][] board = new Piece[8][8];
     private Piece[] kings = new King[2];
-    private Piece[] rooks = new Rook[4];
-    private Piece[] bishops = new Bishop[4];
-    private Piece[] knights = new Knight[4];
-    private Piece[] queens = new Queen[2];
+    private Piece[] rooks = new Rook[4+16]; // 16 cause pawn promotions
+    private Piece[] bishops = new Bishop[4+16];
+    private Piece[] knights = new Knight[4+16];
+    private Piece[] queens = new Queen[2+16];
     private Piece[] pawns = new Pawn[16];
     private String castlingRights;
     private Piece.Color toMove;
@@ -693,6 +694,7 @@ public class Board {
             // Then checks if its legal (space unoccupied and king never enters check)
             if (f == -2)
             {
+                move.castle(CastleType.QUEENSIDE);
                 if (board[rank][file - 1] != null || board[rank][file - 2] != null || board[rank][file - 3] != null)
                 {
                     return;
@@ -707,6 +709,7 @@ public class Board {
             }
             else if (f == 2)
             {
+                move.castle(CastleType.KINGSIDE);
                 if (board[rank][file + 1] != null || board[rank][file + 2] != null)
                 {
                     return;
@@ -736,7 +739,19 @@ public class Board {
         {
             toMove = Piece.Color.LIGHT;
         }
-        move.isCheck(causesCheck(rank, file, r, f));
+        boolean moveIsCheck = causesCheck(rank, file, r, f);
+        move.isCheck(moveIsCheck);
+        // Simulate move then see if it causes checkmate than undo it
+        Piece movedPiece = board[rank][file];
+        board[rank][file] = null;
+        Piece movedTo = board[rank + r][file + f];
+        board[rank + r][file + f] = movedPiece;
+        //if (moveIsCheck && generateMoves().size() == 0)
+        //{
+        //    move.isCheckmate(true);
+        //}
+        board[rank][file] = movedPiece;
+        board[rank + r][file + f] = movedTo;
         if (toMove == Piece.Color.LIGHT)
         {
             toMove = Piece.Color.DARK;
@@ -750,7 +765,12 @@ public class Board {
         {
             move.isCapture(true);
         }
-        // need to fill out rest of builder (checkmate, castle, and promotion)
+        // See's if move is a promotion
+        if (board[rank][file] instanceof Pawn && ((toMove == Piece.Color.LIGHT && rank == 7) || (toMove == Piece.Color.DARK && rank == 0)))
+        {
+            // Possibly copy move here somehow and then add queen and knight promotions
+        }
+        // need to fill out rest of builder (checkmate, and promotion)
         moves.add(move.build());
         return;
     }
@@ -779,7 +799,7 @@ public class Board {
     // Adds any moves the rook can make to the moves concurrent hashset
     public void addRookMoves(Set<Move> moves) {
         int rank, file, r, f;
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 20; i++)
         {
             if (rooks[i] != null && rooks[i].getRank() != -1 && rooks[i].getColor() == toMove)
             {
@@ -795,7 +815,7 @@ public class Board {
     // Adds any moves the bishop can make to the moves concurrent hashset
     public void addBishopMoves(Set<Move> moves) {
         int rank, file, r, f;
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 20; i++)
         {
             if (bishops[i] != null && bishops[i].getRank() != -1 && bishops[i].getColor() == toMove)
             {
@@ -811,7 +831,7 @@ public class Board {
     // Adds any moves the bishop can make to the moves concurrent hashset
     public void addKnightMoves(Set<Move> moves) {
         int rank, file, r, f;
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 20; i++)
         {
             if (knights[i] != null && knights[i].getRank() != -1 && knights[i].getColor() == toMove)
             {
@@ -827,7 +847,7 @@ public class Board {
     // Adds any moves the queen can make to the moves concurrent hashset
     public void addQueenMoves(Set<Move> moves) {
         int rank, file, r, f;
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 18; i++)
         {
             if (queens[i] != null && queens[i].getRank() != -1 && queens[i].getColor() == toMove)
             {
