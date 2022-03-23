@@ -122,6 +122,12 @@ public class Move {
             return this;
         }
 
+        public Builder promotion(Piece promotion)
+        {
+            this.promotion = promotion;
+            return this;
+        }
+
         public Move build() {
             return new Move(this);
         }
