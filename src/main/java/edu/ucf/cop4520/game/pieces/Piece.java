@@ -29,6 +29,15 @@ public abstract class Piece {
         return this.color;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if(o instanceof Piece) {
+            Piece p = (Piece) o;
+            return p.file == this.file && p.rank == this.rank && p.color == this.color;
+        }
+        return false;
+    }
+
     public enum Color {
         LIGHT, DARK
     }

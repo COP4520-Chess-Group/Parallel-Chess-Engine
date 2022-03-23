@@ -1,5 +1,6 @@
 package edu.ucf.cop4520.game;
 
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 
@@ -88,9 +89,131 @@ public class Board {
         return new Board(this.toString());
     }
 
-    public Board move(Move move) {
+    public Piece.Color getToMove() {
+        return toMove;
+    }
 
+    public Board move(Move move) {
+        Piece piece = move.getPiece();
+        board[piece.getFile()][piece.getRank()] = null;
+        piece.move(move);
+        board[piece.getFile()][piece.getRank()] = piece;
         return this;
+    }
+
+    public double evaluate() {
+        double evaluation = 0;
+        String fen = this.toString();
+        String board = fen.substring(0, fen.indexOf(' '));
+        double[] numberOfPieces = new double[6];
+        // Get's the value of all the pieces on the board
+        for(char c : board.toCharArray()) {
+            switch (c) {
+                case 'K':
+                    numberOfPieces[0] += 200;
+                    break;
+                case 'Q':
+                    numberOfPieces[1] += 9;
+                    break;
+                case 'R':
+                    numberOfPieces[2] += 5;
+                    break;
+                case 'B':
+                    numberOfPieces[3] += 3.5;
+                    break;
+                case 'N':
+                    numberOfPieces[4] += 2.5;
+                    break;
+                case 'P':
+                    numberOfPieces[5] += 1;
+                    break;
+                case 'k':
+                    numberOfPieces[0] -= 200;
+                    break;
+                case 'q':
+                    numberOfPieces[1] -= 9;
+                    break;
+                case 'r':
+                    numberOfPieces[2] -= 5;
+                    break;
+                case 'b':
+                    numberOfPieces[3] -= 3.5;
+                    break;
+                case 'n':
+                    numberOfPieces[4] -= 2.5;
+                    break;
+                case 'p':
+                    numberOfPieces[5] -= 1;
+                    break;
+                default:
+                    continue;
+            }
+        }
+        // Sum all the pieces
+        for (double val : numberOfPieces) {
+            evaluation += val;
+        }
+        // Give more value to being able to move
+        evaluation += generateMoves().size() * .1 * (toMove == Piece.Color.LIGHT ? 1 : -1);
+        evaluation += pawnEvaluation();
+        return evaluation;
+    }
+
+    public double pawnEvaluation() {
+        // Stores all the doubled pawns in each file
+        int[] doubledArrayWhite = {-1, -1, -1, -1, -1, -1, -1, -1};
+        int[] doubledArrayBlack = {-1, -1, -1, -1, -1, -1, -1, -1};
+
+        // Finds all the doubled pawns
+        for(int file = 0; file < 8; file++) {
+            for(int rank = 0; rank < 8; rank++) {
+                if(board[rank][file] instanceof Pawn) {
+                    switch(board[rank][file].getColor()) {
+                        case LIGHT:
+                            doubledArrayWhite[file] += 1;
+                            break;
+                        case DARK:
+                            doubledArrayBlack[file] += 1;
+                            break;
+                    }
+                }
+            }
+            if(doubledArrayWhite[file] == -1) doubledArrayWhite[file] = 0;
+            if(doubledArrayBlack[file] == -1) doubledArrayBlack[file] = 0;
+        }
+
+        //Sums all the doubled pawns
+        int doubledPawnsWhite = Arrays.stream(doubledArrayWhite).sum();
+        int doubledPawnsBlack = Arrays.stream(doubledArrayBlack).sum();
+
+        // All the isolated pawns
+        int isolatedPawnsWhite = 0;
+        int isolatedPawnsBlack = 0;
+        // Whether the file has a white or black pawn
+        char[] fileHasPawn = {0x00, 0x00};
+        char[] files = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+        for(int file = 0; file < 8; file++) {
+            for(int rank = 0; rank < 8; rank++) {
+                if(board[rank][file] instanceof Pawn) {
+                    if(board[rank][file].getColor().equals(Piece.Color.LIGHT)) {
+                        fileHasPawn[0] |= files[file];
+                    } else if(board[rank][file].getColor().equals(Piece.Color.DARK)){
+                        fileHasPawn[1] |= files[file];
+                    }
+                }
+            }
+        }
+
+        char[] masks = {0x03, 0x07, 0x0E, 0x1C, 0x38, 0x70, 0xE0, 0xC0};
+        for(int i = 0; i < 8; i++) {
+            char check = (char) (masks[i] & fileHasPawn[0]);
+            if(check == files[i]) isolatedPawnsWhite++;
+
+            check = (char) (masks[i] & fileHasPawn[1]);
+            if(check == files[i]) isolatedPawnsBlack++;
+        }
+
+        return -.5 * (doubledPawnsWhite-doubledPawnsBlack + isolatedPawnsWhite - isolatedPawnsBlack);
     }
 
     /**
@@ -142,12 +265,12 @@ public class Board {
         if (toMove == Piece.Color.LIGHT)
         {
             // Pawns attack from 'above' i.e. from higher ranks to lower ones
-            if (kRank < 7 && kFile > 0 && board[kRank + 1][kFile - 1] instanceof Pawn && 
+            if (kRank < 7 && kFile > 0 && board[kRank + 1][kFile - 1] instanceof Pawn &&
                 board[kRank + 1][kFile - 1].getColor() != toMove)
             {
                 return true;
             }
-            else if (kRank < 7 && kFile < 7 && board[kRank + 1][kFile + 1] instanceof Pawn && 
+            else if (kRank < 7 && kFile < 7 && board[kRank + 1][kFile + 1] instanceof Pawn &&
                 board[kRank + 1][kFile + 1].getColor() != toMove)
             {
                 return true;
@@ -156,12 +279,12 @@ public class Board {
         else
         {
             // Pawns attack from 'below' i.e. from lower ranks to higher ones
-            if (kRank > 0 && kFile > 0 && board[kRank - 1][kFile - 1] instanceof Pawn && 
+            if (kRank > 0 && kFile > 0 && board[kRank - 1][kFile - 1] instanceof Pawn &&
                 board[kRank + 1][kFile - 1].getColor() != toMove)
             {
                 return true;
             }
-            else if (kRank > 0 && kFile < 7 && board[kRank - 1][kFile + 1] instanceof Pawn && 
+            else if (kRank > 0 && kFile < 7 && board[kRank - 1][kFile + 1] instanceof Pawn &&
                 board[kRank + 1][kFile + 1].getColor() != toMove)
             {
                 return true;
@@ -171,7 +294,7 @@ public class Board {
         // Check if rook is attacking king from below
         for (int i = kRank - 1; i >= 0; i--)
         {
-            if ((board[i][kFile] instanceof Rook || board[i][kFile] instanceof Queen) && 
+            if ((board[i][kFile] instanceof Rook || board[i][kFile] instanceof Queen) &&
                 board[i][kFile].getColor() != toMove)
             {
                 return true;
@@ -180,11 +303,11 @@ public class Board {
             {
                 i = -1; // path is blocked
             }
-        }       
+        }
         // Check if rook is attacking king from above
         for (int i = kRank + 1; i < 8; i++)
         {
-            if ((board[i][kFile] instanceof Rook || board[i][kFile] instanceof Queen) && 
+            if ((board[i][kFile] instanceof Rook || board[i][kFile] instanceof Queen) &&
                 board[i][kFile].getColor() != toMove)
             {
                 return true;
@@ -197,7 +320,7 @@ public class Board {
         // Check if rook is attacking king from left
         for (int j = kFile - 1; j >= 0; j--)
         {
-            if ((board[kRank][j] instanceof Rook || board[kRank][j] instanceof Queen) && 
+            if ((board[kRank][j] instanceof Rook || board[kRank][j] instanceof Queen) &&
                 board[kRank][j].getColor() != toMove)
             {
                 return true;
@@ -210,7 +333,7 @@ public class Board {
         // Check if rook is attacking king from right
         for (int j = kFile + 1; j < 8; j++)
         {
-            if ((board[kRank][j] instanceof Rook || board[kRank][j] instanceof Queen) && 
+            if ((board[kRank][j] instanceof Rook || board[kRank][j] instanceof Queen) &&
                 board[kRank][j].getColor() != toMove)
             {
                 return true;
@@ -224,7 +347,7 @@ public class Board {
         // Check for bishops up and to the left
         for (int i = kRank + 1, j = kFile - 1; i < 8 && j >= 0; i++, j--)
         {
-            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) && 
+            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) &&
                 board[i][j].getColor() != toMove)
             {
                 return true;
@@ -237,7 +360,7 @@ public class Board {
         // Check for bishops up and to the right
         for (int i = kRank + 1, j = kFile + 1; i < 8 && j < 8; i++, j++)
         {
-            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) && 
+            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) &&
                 board[i][j].getColor() != toMove)
             {
                 return true;
@@ -250,7 +373,7 @@ public class Board {
         // Check for bishops down and to the left
         for (int i = kRank - 1, j = kFile - 1; i >= 0 && j >= 0; i--, j--)
         {
-            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) && 
+            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) &&
                 board[i][j].getColor() != toMove)
             {
                 return true;
@@ -263,7 +386,7 @@ public class Board {
         // Check for bishops down and to the right
         for (int i = kRank - 1, j = kFile + 1; i >= 0 && j < 8; i--, j++)
         {
-            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) && 
+            if ((board[i][j] instanceof Bishop || board[i][j] instanceof Queen) &&
                 board[i][j].getColor() != toMove)
             {
                 return true;
@@ -341,7 +464,7 @@ public class Board {
                 kRank -= r;
                 kFile -= f;
                 return;
-            }          
+            }
             kRank -= r;
             kFile -= f;
         }
@@ -429,6 +552,18 @@ public class Board {
         // generate queen moves
         // generate pawn moves
         return moves;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(o instanceof Board) {
+            Board b = (Board) o;
+            for(int i = 0; i < 8; i++) {
+                if (!Arrays.equals(b.board[i], this.board[i])) return false;
+            }
+            return true;
+        }
+        return false;
     }
 
 }
